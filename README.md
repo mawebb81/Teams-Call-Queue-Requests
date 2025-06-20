@@ -88,3 +88,28 @@ make sure it's added as an Active assignment, not just Eligible.
 ![image](https://github.com/user-attachments/assets/12e3fbfc-4631-49e2-a069-b73bb2633171)
 
 
+## Logic Apps
+
+Now you need to create the 4 logic apps that will handle the requests that are added to SharePoint.
+
+You need one for each request type
+
++ Call Queue Requests
++ Call Queue Deletions
++ Call Queue Amendments
++ Call Queue Agent Amendments
+
+Create them using whatever your required parameters are for resource location, whether they are consumption or not etc
+
+Once created, before configuring any of the steps, enable the System Assigned managed identity for each via the Identity blade in the Logic App
+
+![image](https://github.com/user-attachments/assets/98587a8a-34a3-458a-b711-dcb71dbed958)
+
+Once you've enabled that, go back into your Automation Account and grant each of the Logic App managed identities the Automation Contributor role so the logic app(s) can call and read automation jobs. 
+![image](https://github.com/user-attachments/assets/67d0fe1e-55b6-464d-b461-334369532dfa)
+
+![image](https://github.com/user-attachments/assets/3eb32ee0-6571-40cf-90e7-1ca2b375cd3e)
+
+
+
+
