@@ -60,7 +60,7 @@ You should get a 201 response like this
 
 If you haven't already got an Azure Resource Group setup for this, set one up or use an existing one.
 
-Create a new Automation Account (or use an existing) and add the PowerShell scripts found [here](docs/Powershell Scripts). You can use either PowerShell 7 or PowerShell 5.1, dealers choice ;)
+Create a new Automation Account (or use an existing) and add the PowerShell scripts found [here](docs/Powershell%20Scripts). You can use either PowerShell 7 or PowerShell 5.1, dealers choice ;)
 
 ## Automation Account
 
