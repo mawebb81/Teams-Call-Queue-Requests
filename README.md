@@ -18,7 +18,7 @@ You'll need to setup 5 SharePoint lists...
 + Call Queue Agent Amendments
 + Call Queue Deletions
 
-I've added csv files with the schema attached to _this_ folder. Create a new SharePoint list using each csv file.
+I've added csv files with the schema attached to [this](.\SharePoint%20Lists) folder. Create a new SharePoint list using each csv file.
 
 You'll need a service account that Power Automate and the Logic App will use to read and write to these lists. You _could_ set the Power App/Power Automate to use the logged in users credentials to do this but that then needs you to give read/write permissions for the lists to every user which we don't want. So create an account in M365, you can call it what you want, and then give it permissions to each SharePoint list. Again you could give the account Edit permissions to the entire SharePoint site but to scope permissions to only what's required it's better to break the permission inheritence on each list and then grant Full Control of the list(s) to the service account.
 
@@ -186,7 +186,7 @@ I've listed below each of the steps for this Logic App, add each one with the re
 
 Now we have this one created, we can create the rest using the code below and just make a few changes to the code, this is mainly to update the connection references and parameters to reflect your environment.
 
-The code for the other 3 Logic Apps can be found _here_.
+The code for the other 3 Logic Apps can be found [here](\Logic%20App%20Code).
 
 For each one open the code in whatever your preferred code editor is i.e. VS Code etc and then at the bottom where you see the connections specified update the sections for each that are highlighted below
 ![image](https://github.com/user-attachments/assets/28e25e38-a444-495c-a26e-c1f38860ae57)
@@ -197,13 +197,20 @@ Next, locate the parameters section of the code and amend the items there to mat
 
 ![image](https://github.com/user-attachments/assets/03177bb8-f0fc-47ae-8d69-d8fc005fa38d)
 
+In the Logic App that handles new Call Queue requests there are a few more places you'll need to update values based on your environment. These are:
+
++ Change the email address that any failure emails are sent from to suit your requirements
++ There are more parameters in this Logic App than the others so go through and update those accordingly
++ Update the body of the emails within the Logic App to suit your requirements
++ Go through and check any variables that are initialised and confirm if you want to keep the values I've set or if you want to update them
+
 Once you've updated all of those you can copy all of the code for the Logic App, return to the Code View in the new Logic App and paste it in. Click Save and you should now have the new Logic App created with the right connections/parameters etc. Go to the Logic App Designer to check each step is valid and you don't have any errors.
 
 ## Power App/Power Automate
 
 The last part is to create/import the Power App and Power Automate flows. I'm assuming you've got your own Power App environment to use already of that you've had one created for you to use for this. 
 
-In the environment go to Solutions and click Import Solution. Upload the zip file that can be found _here_. This will import the Power App and the associated Power Automate Flows. You'll be asked to re-establish the connections for the Power Automate flows. Connect using the relevant accounts, for SharePoint connections use the serivce account we gave permissions to the SharePoint lists and for Exchange connections use the same account we used in the Logic App to send emails. 
+In the environment go to Solutions and click Import Solution. Upload the zip file that can be found [here](.\Power%20App). This will import the Power App and the associated Power Automate Flows. You'll be asked to re-establish the connections for the Power Automate flows. Connect using the relevant accounts, for SharePoint connections use the serivce account we gave permissions to the SharePoint lists and for Exchange connections use the same account we used in the Logic App to send emails. 
 
 Once imported the Power App should be ready to go. If you've named the SharePoint lists differently to how I've named them in this example you will need to update the connection references in the Power App and Power Automate to reflect whatever you have named them.
 
