@@ -18,7 +18,7 @@ You'll need to setup 5 SharePoint lists...
 + Call Queue Agent Amendments
 + Call Queue Deletions
 
-I've added csv files with the schema attached to [this](.\SharePoint%20Lists) folder. Create a new SharePoint list using each csv file.
+I've added csv files with the schema attached to [this](./SharePoint%20Lists) folder. Create a new SharePoint list using each csv file.
 
 You'll need a service account that Power Automate and the Logic App will use to read and write to these lists. You _could_ set the Power App/Power Automate to use the logged in users credentials to do this but that then needs you to give read/write permissions for the lists to every user which we don't want. So create an account in M365, you can call it what you want, and then give it permissions to each SharePoint list. Again you could give the account Edit permissions to the entire SharePoint site but to scope permissions to only what's required it's better to break the permission inheritence on each list and then grant Full Control of the list(s) to the service account.
 
