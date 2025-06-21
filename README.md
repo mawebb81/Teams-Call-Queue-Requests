@@ -194,12 +194,24 @@ For each one open the code in whatever your preferred code editor is i.e. VS Cod
 You won't have all these for each Logic App but the principle is the same. For each connection change aaa-aaa-aaa to your Azure subscription number, change bbbb to the name of your Azure Resource Group and then for the names of the connections, such as sharepointonline-2, make sure these look exactly the same as your code from the Call Queue Deletion Logic App. I've found it easier to have the code view for the Deletion Logic App on one screen and the code for the new one I'm creating on another so I can easily compare/copy and paste as needed between them.
 
 Next, locate the parameters section of the code and amend the items there to match your environment. The example below shows two parameters, you'll have more depending on the type of Logic App. Update the values as needed, in this example repalcing aaa with the SharePoint Site URL and bbbb with the List Name
+
 ![image](https://github.com/user-attachments/assets/03177bb8-f0fc-47ae-8d69-d8fc005fa38d)
 
 Once you've updated all of those you can copy all of the code for the Logic App, return to the Code View in the new Logic App and paste it in. Click Save and you should now have the new Logic App created with the right connections/parameters etc. Go to the Logic App Designer to check each step is valid and you don't have any errors.
 
 ## Power App/Power Automate
 
-The last part is to create/import the Power App and Power Automate flows. I'm assuming you've got your own Power App environment to use already of that you've had one created for you to use for this. In the environment go to Solutions and click Import Solution. Upload the zip file that can be found _here_. This will import the Power App and the associated Power Automate Flows. You'll be asked to re-establish the connections for the Power Automate flows. Connect using the relevant accounts, for SharePoint connections use the serivce account we gave permissions to the SharePoint lists and for Exchange connections use the same account we used in the Logic App to send emails. Once imported the Power App should be ready to go. If you've named the SharePoint lists differently to how I've named them in this example you will need to update the connection references in the Power App and Power Automate to reflect whatever you have named them.
+The last part is to create/import the Power App and Power Automate flows. I'm assuming you've got your own Power App environment to use already of that you've had one created for you to use for this. 
 
+In the environment go to Solutions and click Import Solution. Upload the zip file that can be found _here_. This will import the Power App and the associated Power Automate Flows. You'll be asked to re-establish the connections for the Power Automate flows. Connect using the relevant accounts, for SharePoint connections use the serivce account we gave permissions to the SharePoint lists and for Exchange connections use the same account we used in the Logic App to send emails. 
+
+Once imported the Power App should be ready to go. If you've named the SharePoint lists differently to how I've named them in this example you will need to update the connection references in the Power App and Power Automate to reflect whatever you have named them.
+
+## Add the App to Teams
+
+If you want to add the Power App to Microsoft Teams so it can be used there instead of via a web brower, firstly go to the app in the Power Apps environment and click on the ellipsis icon then Share -> Add to Teams
+
+![image](https://github.com/user-attachments/assets/fac9fad0-e7d7-4f51-a83c-3e681b2065bf)
+
+Add any details you want and then if you're already logged in with an account that has permissions to add apps to Teams click _Add to Teams_ otherwise click _Download app_ and then give the zip file to a Teams Admin to add via Teams Admin Centre.
 
