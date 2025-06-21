@@ -60,7 +60,7 @@ You should get a 201 response like this
 
 If you haven't already got an Azure Resource Group setup for this, set one up or use an existing one.
 
-Create a new Automation Account (or use an existing) and add the PowerShell scripts found [here](/Powershell%20Scripts). You can use either PowerShell 7 or PowerShell 5.1, dealers choice ;)
+Create a new Automation Account (or use an existing) and add the PowerShell scripts found [here](./Powershell%20Scripts). You can use either PowerShell 7 or PowerShell 5.1, dealers choice ;)
 
 ## Automation Account
 
@@ -186,7 +186,7 @@ I've listed below each of the steps for this Logic App, add each one with the re
 
 Now we have this one created, we can create the rest using the code below and just make a few changes to the code, this is mainly to update the connection references and parameters to reflect your environment.
 
-The code for the other 3 Logic Apps can be found [here](\Logic%20App%20Code).
+The code for the other 3 Logic Apps can be found [here](./Logic%20App%20Code).
 
 For each one open the code in whatever your preferred code editor is i.e. VS Code etc and then at the bottom where you see the connections specified update the sections for each that are highlighted below
 ![image](https://github.com/user-attachments/assets/28e25e38-a444-495c-a26e-c1f38860ae57)
@@ -210,7 +210,7 @@ Once you've updated all of those you can copy all of the code for the Logic App,
 
 The last part is to create/import the Power App and Power Automate flows. I'm assuming you've got your own Power App environment to use already of that you've had one created for you to use for this. 
 
-In the environment go to Solutions and click Import Solution. Upload the zip file that can be found [here](.\Power%20App). This will import the Power App and the associated Power Automate Flows. You'll be asked to re-establish the connections for the Power Automate flows. Connect using the relevant accounts, for SharePoint connections use the serivce account we gave permissions to the SharePoint lists and for Exchange connections use the same account we used in the Logic App to send emails. 
+In the environment go to Solutions and click Import Solution. Upload the zip file that can be found [here](./Power%20App). This will import the Power App and the associated Power Automate Flows. You'll be asked to re-establish the connections for the Power Automate flows. Connect using the relevant accounts, for SharePoint connections use the serivce account we gave permissions to the SharePoint lists and for Exchange connections use the same account we used in the Logic App to send emails. 
 
 Once imported the Power App should be ready to go. If you've named the SharePoint lists differently to how I've named them in this example you will need to update the connection references in the Power App and Power Automate to reflect whatever you have named them.
 
