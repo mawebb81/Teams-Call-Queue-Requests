@@ -1,0 +1,745 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "When_New_Agent_Amendment_Request_is_Received": {
+                "recurrence": {
+                    "interval": 90,
+                    "frequency": "Second"
+                },
+                "evaluatedRecurrence": {
+                    "interval": 90,
+                    "frequency": "Second"
+                },
+                "splitOn": "@triggerBody()?['value']",
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/onnewitems"
+                }
+            }
+        },
+        "actions": {
+            "Get_Details_from_Request": {
+                "runAfter": {},
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(encodeURIComponent(triggerBody()?['ID']))}/changes",
+                    "queries": {
+                        "since": "@triggerBody()?['{TriggerWindowStartToken}']",
+                        "includeDrafts": false
+                    }
+                }
+            },
+            "Check_if_Add_and_Remove": {
+                "actions": {
+                    "Add_Each_User_to_M365_Group": {
+                        "foreach": "@variables('AddArray')",
+                        "actions": {
+                            "Add_member_to_group": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['office365groups-1']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "path": "/v1.0/groups/@{encodeURIComponent(triggerBody()?['M365GroupID'])}/members/$ref",
+                                    "queries": {
+                                        "userUpn": "@{items('Add_Each_User_to_M365_Group')}"
+                                    }
+                                }
+                            }
+                        },
+                        "type": "Foreach"
+                    },
+                    "Remove_Each_User_from_M365_Group": {
+                        "foreach": "@variables('RemoveArray')",
+                        "actions": {
+                            "Remove_member_from_group": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['office365groups-1']['connectionId']"
+                                        }
+                                    },
+                                    "method": "delete",
+                                    "path": "/v1.0/groups/@{encodeURIComponent(triggerBody()?['M365GroupID'])}/members/memberId/$ref",
+                                    "queries": {
+                                        "userUpn": "@{items('Remove_Each_User_from_M365_Group')}"
+                                    }
+                                }
+                            }
+                        },
+                        "runAfter": {
+                            "Add_Each_User_to_M365_Group": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "Foreach"
+                    },
+                    "Send_Fulfilment_Email_-_Add_and_Remove": {
+                        "runAfter": {
+                            "Add_Each_User_to_Variable_-_Add-Remove": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "To": "@triggerBody()?['Requester']?['Email']",
+                                "Subject": "Teams Call Queue Agent Amendment - @{triggerBody()?['RequestID']}",
+                                "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request has been fulfilled.<br><br>The following users were added:<br>@{triggerBody()?['AgentstoAdd']}<br><br>The following users were removed:<br>@{triggerBody()?['AgentstoRemove']}<br><br>Thanks,<br>Voice and Video Team</p>",
+                                "Importance": "Normal"
+                            },
+                            "path": "/v2/Mail"
+                        }
+                    },
+                    "Update_item_-_Add_and_Remove": {
+                        "runAfter": {
+                            "Send_Fulfilment_Email_-_Add_and_Remove": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                }
+                            },
+                            "method": "patch",
+                            "body": {
+                                "Status": "Completed"
+                            },
+                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                        }
+                    },
+                    "Get_Group_Members_-_Add-Remove": {
+                        "runAfter": {
+                            "Remove_Each_User_from_M365_Group": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['office365groups-1']['connectionId']"
+                                }
+                            },
+                            "method": "get",
+                            "path": "/v1.0/groups/@{encodeURIComponent(triggerBody()?['M365GroupID'])}/members"
+                        }
+                    },
+                    "Add_Each_User_to_Variable_-_Add-Remove": {
+                        "foreach": "@body('Get_Group_Members_-_Add-Remove')?['value']",
+                        "actions": {
+                            "Append_to_string_variable_-_Add-Remove": {
+                                "type": "AppendToStringVariable",
+                                "inputs": {
+                                    "name": "New Members",
+                                    "value": "@concat(item()?['mail'],',')"
+                                }
+                            }
+                        },
+                        "runAfter": {
+                            "Get_Group_Members_-_Add-Remove": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "Foreach"
+                    },
+                    "Update_Agents_-_Add-Remove": {
+                        "runAfter": {
+                            "Update_item_-_Add_and_Remove": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                }
+                            },
+                            "method": "patch",
+                            "body": {
+                                "Agents": "@variables('New Members')"
+                            },
+                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointID'])}"
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Check_if_Remove_Users": [
+                        "Succeeded"
+                    ]
+                },
+                "else": {
+                    "actions": {
+                        "Check_if_any_Agents_to_Remove": {
+                            "actions": {
+                                "Remove_Only_-_Remove_Each_User_from_M365_Group": {
+                                    "foreach": "@variables('RemoveArray')",
+                                    "actions": {
+                                        "Remove_Only_-_Remove_Each_User_from_Group": {
+                                            "type": "ApiConnection",
+                                            "inputs": {
+                                                "host": {
+                                                    "connection": {
+                                                        "name": "@parameters('$connections')['office365groups-1']['connectionId']"
+                                                    }
+                                                },
+                                                "method": "delete",
+                                                "path": "/v1.0/groups/@{encodeURIComponent(triggerBody()?['M365GroupID'])}/members/memberId/$ref",
+                                                "queries": {
+                                                    "userUpn": "@{items('Remove_Only_-_Remove_Each_User_from_M365_Group')}"
+                                                }
+                                            }
+                                        },
+                                        "Send_Fulfilment_Email_-_Remove_Only": {
+                                            "runAfter": {
+                                                "Add_Each_User_to_Variable_-_Remove": [
+                                                    "Succeeded"
+                                                ]
+                                            },
+                                            "type": "ApiConnection",
+                                            "inputs": {
+                                                "host": {
+                                                    "connection": {
+                                                        "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                    }
+                                                },
+                                                "method": "post",
+                                                "body": {
+                                                    "To": "@triggerBody()?['Requester']?['Email']",
+                                                    "Subject": "Teams Call Queue Agent Amendment - @{triggerBody()?['RequestID']}",
+                                                    "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request has been fulfilled.<br><br>The following users were removed:<br>@{triggerBody()?['AgentstoRemove']}<br><br>Thanks,<br>Voice and Video Team</p>",
+                                                    "Importance": "Normal"
+                                                },
+                                                "path": "/v2/Mail"
+                                            }
+                                        },
+                                        "Update_item_-_Remove_Only": {
+                                            "runAfter": {
+                                                "Send_Fulfilment_Email_-_Remove_Only": [
+                                                    "Succeeded"
+                                                ]
+                                            },
+                                            "type": "ApiConnection",
+                                            "inputs": {
+                                                "host": {
+                                                    "connection": {
+                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                    }
+                                                },
+                                                "method": "patch",
+                                                "body": {
+                                                    "Status": "Completed"
+                                                },
+                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                            }
+                                        },
+                                        "Get_Group_Members_-_Remove": {
+                                            "runAfter": {
+                                                "Remove_Only_-_Remove_Each_User_from_Group": [
+                                                    "Succeeded"
+                                                ]
+                                            },
+                                            "type": "ApiConnection",
+                                            "inputs": {
+                                                "host": {
+                                                    "connection": {
+                                                        "name": "@parameters('$connections')['office365groups-1']['connectionId']"
+                                                    }
+                                                },
+                                                "method": "get",
+                                                "path": "/v1.0/groups/@{encodeURIComponent(triggerBody()?['M365GroupID'])}/members"
+                                            }
+                                        },
+                                        "Add_Each_User_to_Variable_-_Remove": {
+                                            "foreach": "@body('Get_Group_Members_-_Remove')?['value']",
+                                            "actions": {
+                                                "Append_to_string_variable_-_Remove": {
+                                                    "type": "AppendToStringVariable",
+                                                    "inputs": {
+                                                        "name": "New Members",
+                                                        "value": "@concat(item()?['mail'],',')"
+                                                    }
+                                                }
+                                            },
+                                            "runAfter": {
+                                                "Get_Group_Members_-_Remove": [
+                                                    "Succeeded"
+                                                ]
+                                            },
+                                            "type": "Foreach"
+                                        },
+                                        "Update_Agents_-_Remove": {
+                                            "runAfter": {
+                                                "Update_item_-_Remove_Only": [
+                                                    "Succeeded"
+                                                ]
+                                            },
+                                            "type": "ApiConnection",
+                                            "inputs": {
+                                                "host": {
+                                                    "connection": {
+                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                    }
+                                                },
+                                                "method": "patch",
+                                                "body": {
+                                                    "Agents": "@variables('New Members')"
+                                                },
+                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointID'])}"
+                                            }
+                                        }
+                                    },
+                                    "type": "Foreach"
+                                }
+                            },
+                            "else": {
+                                "actions": {
+                                    "Check_if_any_Agents_to_Add": {
+                                        "actions": {
+                                            "Add_Only_-_Add_Each_User_to_M365_Group": {
+                                                "foreach": "@variables('AddArray')",
+                                                "actions": {
+                                                    "Add_Only_-_Add_Each_User_to_Group": {
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['office365groups-1']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "post",
+                                                            "path": "/v1.0/groups/@{encodeURIComponent(triggerBody()?['M365GroupID'])}/members/$ref",
+                                                            "queries": {
+                                                                "userUpn": "@{items('Add_Only_-_Add_Each_User_to_M365_Group')}"
+                                                            }
+                                                        }
+                                                    },
+                                                    "Send_Fulfilment_Email_-_Add_Only": {
+                                                        "runAfter": {
+                                                            "Add_Each_User_to_Variable_-_Add": [
+                                                                "Succeeded"
+                                                            ]
+                                                        },
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "post",
+                                                            "body": {
+                                                                "To": "@triggerBody()?['Requester']?['Email']",
+                                                                "Subject": "Teams Call Queue Agent Amendment - @{triggerBody()?['RequestID']}",
+                                                                "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request has been fulfilled.<br><br>The following users were added:<br>@{triggerBody()?['AgentstoAdd']}<br><br>Thanks,<br>Voice and Video Team</p>",
+                                                                "Importance": "Normal"
+                                                            },
+                                                            "path": "/v2/Mail"
+                                                        }
+                                                    },
+                                                    "Update_item_-_Add_Only": {
+                                                        "runAfter": {
+                                                            "Send_Fulfilment_Email_-_Add_Only": [
+                                                                "Succeeded"
+                                                            ]
+                                                        },
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "patch",
+                                                            "body": {
+                                                                "Status": "Completed"
+                                                            },
+                                                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                        }
+                                                    },
+                                                    "Get_Group_Members_-_Add": {
+                                                        "runAfter": {
+                                                            "Add_Only_-_Add_Each_User_to_Group": [
+                                                                "Succeeded"
+                                                            ]
+                                                        },
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['office365groups-1']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "get",
+                                                            "path": "/v1.0/groups/@{encodeURIComponent(triggerBody()?['M365GroupID'])}/members"
+                                                        }
+                                                    },
+                                                    "Add_Each_User_to_Variable_-_Add": {
+                                                        "foreach": "@body('Get_Group_Members_-_Add')?['value']",
+                                                        "actions": {
+                                                            "Append_to_string_variable_-_Add": {
+                                                                "type": "AppendToStringVariable",
+                                                                "inputs": {
+                                                                    "name": "New Members",
+                                                                    "value": "@concat(item()?['mail'],',')"
+                                                                }
+                                                            }
+                                                        },
+                                                        "runAfter": {
+                                                            "Get_Group_Members_-_Add": [
+                                                                "Succeeded"
+                                                            ]
+                                                        },
+                                                        "type": "Foreach"
+                                                    },
+                                                    "Update_Agents_-_Add": {
+                                                        "runAfter": {
+                                                            "Update_item_-_Add_Only": [
+                                                                "Succeeded"
+                                                            ]
+                                                        },
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "patch",
+                                                            "body": {
+                                                                "Agents": "@variables('New Members')"
+                                                            },
+                                                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointID'])}"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "Foreach"
+                                            }
+                                        },
+                                        "else": {
+                                            "actions": {
+                                                "Failed": {
+                                                    "type": "ApiConnection",
+                                                    "inputs": {
+                                                        "host": {
+                                                            "connection": {
+                                                                "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                            }
+                                                        },
+                                                        "method": "patch",
+                                                        "body": {
+                                                            "Status": "Failed"
+                                                        },
+                                                        "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                    }
+                                                },
+                                                "Terminate": {
+                                                    "runAfter": {
+                                                        "Failed": [
+                                                            "Succeeded"
+                                                        ]
+                                                    },
+                                                    "type": "Terminate",
+                                                    "inputs": {
+                                                        "runStatus": "Failed",
+                                                        "runError": {
+                                                            "message": "Request has no agents to add or remove"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "expression": {
+                                            "and": [
+                                                {
+                                                    "equals": [
+                                                        "@triggerBody()?['AddAgents']",
+                                                        "Yes"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "type": "If"
+                                    }
+                                }
+                            },
+                            "expression": {
+                                "and": [
+                                    {
+                                        "equals": [
+                                            "@triggerBody()?['RemoveAgents']",
+                                            "Yes"
+                                        ]
+                                    }
+                                ]
+                            },
+                            "type": "If"
+                        }
+                    }
+                },
+                "expression": {
+                    "and": [
+                        {
+                            "equals": [
+                                "@triggerBody()?['AddAgents']",
+                                "Yes"
+                            ]
+                        },
+                        {
+                            "equals": [
+                                "@triggerBody()?['RemoveAgents']",
+                                "Yes"
+                            ]
+                        }
+                    ]
+                },
+                "type": "If"
+            },
+            "GetAddAgentsString": {
+                "runAfter": {
+                    "Get_Details_from_Request": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "AgentsToAddString",
+                            "type": "string",
+                            "value": "@{triggerBody()?['AgentstoAdd']}"
+                        }
+                    ]
+                }
+            },
+            "GetRemoveAgentsString": {
+                "runAfter": {
+                    "GetAddAgentsString": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "AgentsToRemoveString",
+                            "type": "string",
+                            "value": "@{triggerBody()?['AgentstoRemove']}"
+                        }
+                    ]
+                }
+            },
+            "Check_if_Add_Users": {
+                "actions": {
+                    "Set_Add_Array_No": {
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "AddArray",
+                            "value": [
+                                "No",
+                                "Agents"
+                            ]
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Trimmed_Members": [
+                        "Succeeded"
+                    ]
+                },
+                "else": {
+                    "actions": {
+                        "Set_Add_Array_with_Users": {
+                            "type": "SetVariable",
+                            "inputs": {
+                                "name": "AddArray",
+                                "value": "@split(variables('AgentsToAddString'),',')"
+                            }
+                        }
+                    }
+                },
+                "expression": {
+                    "and": [
+                        {
+                            "equals": [
+                                "@equals(variables('AgentsToAddString'),'')",
+                                true
+                            ]
+                        }
+                    ]
+                },
+                "type": "If"
+            },
+            "Add_Array": {
+                "runAfter": {
+                    "GetRemoveAgentsString": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "AddArray",
+                            "type": "array"
+                        }
+                    ]
+                }
+            },
+            "Check_if_Remove_Users": {
+                "actions": {
+                    "Set_Remove_Array_No": {
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "RemoveArray",
+                            "value": [
+                                "No",
+                                "Agents"
+                            ]
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Check_if_Add_Users": [
+                        "Succeeded"
+                    ]
+                },
+                "else": {
+                    "actions": {
+                        "Set_Remove_Array_with_Users": {
+                            "type": "SetVariable",
+                            "inputs": {
+                                "name": "RemoveArray",
+                                "value": "@split(variables('AgentsToRemoveString'),',')"
+                            }
+                        }
+                    }
+                },
+                "expression": {
+                    "and": [
+                        {
+                            "equals": [
+                                "@equals(variables('AgentsToRemoveString'),'')",
+                                true
+                            ]
+                        }
+                    ]
+                },
+                "type": "If"
+            },
+            "Remove_Array": {
+                "runAfter": {
+                    "Add_Array": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "RemoveArray",
+                            "type": "array"
+                        }
+                    ]
+                }
+            },
+            "New_Member_Variable": {
+                "runAfter": {
+                    "Remove_Array": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "New Members",
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "Trimmed_Members": {
+                "runAfter": {
+                    "New_Member_Variable": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "Trimmed Members",
+                            "type": "string"
+                        }
+                    ]
+                }
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "SharePoint Site": {
+                "defaultValue": "aaaa",
+                "type": "String"
+            },
+            "List Name": {
+                "defaultValue": "bbbb",
+                "type": "String"
+            },
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "sharepointonline-1": {
+                    "id": "/subscriptions/aaa-aaa-aaa/providers/Microsoft.Web/locations/uksouth/managedApis/sharepointonline",
+                    "connectionId": "/subscriptions/aaa-aaa-aaa/resourceGroups/bbbb/providers/Microsoft.Web/connections/sharepointonline-2",
+                    "connectionName": "sharepointonline-2"
+                },
+                "office365groups-1": {
+                    "id": "/subscriptions/aaa-aaa-aaa/providers/Microsoft.Web/locations/uksouth/managedApis/office365groups",
+                    "connectionId": "/subscriptions/aaa-aaa-aaa/resourceGroups/bbbb/providers/Microsoft.Web/connections/office365groups-1",
+                    "connectionName": "office365groups-1"
+                },
+                "office365-1": {
+                    "id": "/subscriptions/aaa-aaa-aaa/providers/Microsoft.Web/locations/uksouth/managedApis/office365",
+                    "connectionId": "/subscriptions/aaa-aaa-aaa/resourceGroups/bbbb/providers/Microsoft.Web/connections/office365-2",
+                    "connectionName": "office365-2"
+                }
+            }
+        }
+    }
+}

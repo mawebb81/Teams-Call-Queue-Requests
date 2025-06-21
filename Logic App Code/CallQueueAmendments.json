@@ -1,0 +1,1733 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "When_a_new_request_is_received": {
+                "recurrence": {
+                    "interval": 90,
+                    "frequency": "Second"
+                },
+                "evaluatedRecurrence": {
+                    "interval": 90,
+                    "frequency": "Second"
+                },
+                "splitOn": "@triggerBody()?['value']",
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                        }
+                    },
+                    "method": "get",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/onnewitems"
+                }
+            }
+        },
+        "actions": {
+            "Get_ID_of_new_item": {
+                "runAfter": {},
+                "type": "ApiConnection",
+                "inputs": {
+                    "host": {
+                        "connection": {
+                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                        }
+                    },
+                    "method": "post",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(encodeURIComponent(triggerBody()?['ID']))}/changes",
+                    "queries": {
+                        "since": "@triggerBody()?['{TriggerWindowStartToken}']",
+                        "includeDrafts": false
+                    }
+                }
+            },
+            "Welcome-Yes,Overflow-No,Timeout-No": {
+                "actions": {
+                    "Amend_Call_Queue_-_Welcome": {
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+                                }
+                            },
+                            "method": "put",
+                            "body": {
+                                "properties": {
+                                    "parameters": {
+                                        "groupId": "@triggerBody()?['M365GroupID']",
+                                        "ResourceId": "@triggerBody()?['CQResourceID']",
+                                        "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                        "TimeoutThreshold": "@triggerBody()?['TimeoutThreshold']",
+                                        "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                        "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                        "AgentAlertTime": "@triggerBody()?['AgentAlertTime']",
+                                        "OverflowThreshold": "@triggerBody()?['OverflowThreshold']",
+                                        "CallQueueName": "@triggerBody()?['CQName']",
+                                        "WelcomeTextToSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                        "CallQueueID": "@triggerBody()?['CallQueueID']",
+                                        "NameChange": "@triggerBody()?['CQNameChange']"
+                                    }
+                                }
+                            },
+                            "path": "/subscriptions/@{encodeURIComponent(parameters('Subscription Name'))}/resourceGroups/@{encodeURIComponent(parameters('Resource Group'))}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent(parameters('Automation Account Name'))}/jobs",
+                            "queries": {
+                                "x-ms-api-version": "2015-10-31",
+                                "runbookName": "CQAmend-WelcomeGreeting-NoTimeoutNoOverflow",
+                                "wait": true
+                            }
+                        }
+                    },
+                    "Check_Runbook_Status_-_Welcome": {
+                        "actions": {
+                            "Send_Fulfilment_Email": {
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": {
+                                        "To": "@triggerBody()?['Owner']",
+                                        "Subject": "Teams Call Queue Amendment Request - @{triggerBody()?['RequestID']}",
+                                        "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request, @{triggerBody()?['RequestID']} , to amend Call Queue @{triggerBody()?['CQName']} has been completed.<br><br>Thanks,<br><br>The Voice and Video Team</p>",
+                                        "Importance": "Normal"
+                                    },
+                                    "path": "/v2/Mail"
+                                }
+                            },
+                            "Update_Item_Status_-_Welcome_Success": {
+                                "runAfter": {
+                                    "Send_Fulfilment_Email": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                        }
+                                    },
+                                    "method": "patch",
+                                    "body": {
+                                        "Status": "Completed"
+                                    },
+                                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                }
+                            },
+                            "Update_Call_Queue_List_-_Welcome": {
+                                "runAfter": {
+                                    "Update_Item_Status_-_Welcome_Success": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                        }
+                                    },
+                                    "method": "patch",
+                                    "body": {
+                                        "Name": "@triggerBody()?['CQName']",
+                                        "WelcomeGreeting": "@triggerBody()?['WelcomeValue']",
+                                        "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                        "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                        "AgentAlertTime": "@variables('CQAlertTime')",
+                                        "OverflowThreshold": "@variables('CQOverflowTime')",
+                                        "TimeoutThreshold": "@variables('CQTimeoutTime')",
+                                        "WelcomeTexttoSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                        "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                        "OverflowText": "@triggerBody()?['OverflowGreeting']",
+                                        "TimeoutText": "@triggerBody()?['TimeoutGreeting']",
+                                        "OverflowGreeting": "@triggerBody()?['OverflowValue']",
+                                        "TimeoutGreeting": "@triggerBody()?['TimeoutValue']"
+                                    },
+                                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointListID'])}"
+                                }
+                            }
+                        },
+                        "runAfter": {
+                            "Amend_Call_Queue_-_Welcome": [
+                                "Succeeded"
+                            ]
+                        },
+                        "else": {
+                            "actions": {
+                                "Send_Error_Email": {
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "body": {
+                                            "To": "abc@xyz.com",
+                                            "Subject": "Teams Call Queue Request Failure",
+                                            "Body": "<p class=\"editor-paragraph\">This email is to notify that a request to amend a Teams Call Queue has failed to complete.<br><br>Please log onto Azure to check for errors in the Runbook.<br><br>Job ID: @{body('Amend_Call_Queue_-_Welcome')?['properties']?['jobId']}<br>Request ID: @{body('Amend_Call_Queue_-_Welcome')?['id']}<br>Start Time: @{body('Amend_Call_Queue_-_Welcome')?['properties']?['startTime']}<br></p><br>",
+                                            "Importance": "High"
+                                        },
+                                        "path": "/v2/Mail"
+                                    }
+                                },
+                                "Update_Item_Status_Welcome_Fail": {
+                                    "runAfter": {
+                                        "Send_Error_Email": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "patch",
+                                        "body": {
+                                            "Status": "Failed"
+                                        },
+                                        "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                    }
+                                }
+                            }
+                        },
+                        "expression": {
+                            "and": [
+                                {
+                                    "equals": [
+                                        "@body('Amend_Call_Queue_-_Welcome')?['properties']?['status']",
+                                        "Completed"
+                                    ]
+                                }
+                            ]
+                        },
+                        "type": "If"
+                    }
+                },
+                "runAfter": {
+                    "CQTimeoutTime": [
+                        "Succeeded"
+                    ]
+                },
+                "else": {
+                    "actions": {
+                        "Welcome-Yes,Overflow-Yes,Timeout-No": {
+                            "actions": {
+                                "Amend_Call_Queue_-_Welcome_and_Overflow": {
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "put",
+                                        "body": {
+                                            "properties": {
+                                                "parameters": {
+                                                    "groupId": "@triggerBody()?['M365GroupID']",
+                                                    "ResourceId": "@triggerBody()?['CQResourceID']",
+                                                    "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                    "TimeoutThreshold": "@triggerBody()?['TimeoutThreshold']",
+                                                    "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                    "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                    "ConferenceMode": "null",
+                                                    "AgentAlertTime": "@triggerBody()?['AgentAlertTime']",
+                                                    "OverflowThreshold": "@triggerBody()?['OverflowThreshold']",
+                                                    "CallQueueName": "@triggerBody()?['CQName']",
+                                                    "WelcomeTextToSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                    "CallQueueID": "@triggerBody()?['CallQueueID']",
+                                                    "OverflowTextToSpeech": "@triggerBody()?['OverflowGreeting']",
+                                                    "NameChange": "@triggerBody()?['CQNameChange']"
+                                                }
+                                            }
+                                        },
+                                        "path": "/subscriptions/@{encodeURIComponent(parameters('Subscription Name'))}/resourceGroups/@{encodeURIComponent(parameters('Resource Group'))}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent(parameters('Automation Account Name'))}/jobs",
+                                        "queries": {
+                                            "x-ms-api-version": "2015-10-31",
+                                            "runbookName": "CQAmend-WelcomeGreetingOverflowGreeting-NoTimeout",
+                                            "wait": true
+                                        }
+                                    }
+                                },
+                                "Check_Runbook_Status_WandO": {
+                                    "actions": {
+                                        "Send_Fulfilment_Email_-_WandO": {
+                                            "type": "ApiConnection",
+                                            "inputs": {
+                                                "host": {
+                                                    "connection": {
+                                                        "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                    }
+                                                },
+                                                "method": "post",
+                                                "body": {
+                                                    "To": "@triggerBody()?['Owner']",
+                                                    "Subject": "Teams Call Queue Amendment Request - @{triggerBody()?['RequestID']}",
+                                                    "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request, @{triggerBody()?['RequestID']} , to amend Call Queue @{triggerBody()?['CQName']} has been completed.<br><br>Thanks,<br><br>The Voice and Video Team</p>",
+                                                    "Importance": "Normal"
+                                                },
+                                                "path": "/v2/Mail"
+                                            }
+                                        },
+                                        "Update_Item_-_WandO_Success": {
+                                            "runAfter": {
+                                                "Send_Fulfilment_Email_-_WandO": [
+                                                    "Succeeded"
+                                                ]
+                                            },
+                                            "type": "ApiConnection",
+                                            "inputs": {
+                                                "host": {
+                                                    "connection": {
+                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                    }
+                                                },
+                                                "method": "patch",
+                                                "body": {
+                                                    "Status": "Completed"
+                                                },
+                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                            }
+                                        },
+                                        "Update_Call_Queue_List_-_WandO": {
+                                            "runAfter": {
+                                                "Update_Item_-_WandO_Success": [
+                                                    "Succeeded"
+                                                ]
+                                            },
+                                            "type": "ApiConnection",
+                                            "inputs": {
+                                                "host": {
+                                                    "connection": {
+                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                    }
+                                                },
+                                                "method": "patch",
+                                                "body": {
+                                                    "Name": "@triggerBody()?['CQName']",
+                                                    "WelcomeGreeting": "@triggerBody()?['WelcomeValue']",
+                                                    "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                    "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                    "AgentAlertTime": "@variables('CQAlertTime')",
+                                                    "OverflowThreshold": "@variables('CQOverflowTime')",
+                                                    "TimeoutThreshold": "@variables('CQTimeoutTime')",
+                                                    "WelcomeTexttoSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                    "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                    "OverflowText": "@triggerBody()?['OverflowGreeting']",
+                                                    "TimeoutText": "@triggerBody()?['TimeoutGreeting']",
+                                                    "OverflowGreeting": "@triggerBody()?['OverflowValue']",
+                                                    "TimeoutGreeting": "@triggerBody()?['TimeoutValue']"
+                                                },
+                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointListID'])}"
+                                            }
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Amend_Call_Queue_-_Welcome_and_Overflow": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "else": {
+                                        "actions": {
+                                            "Send_Error_Email_-_WandO": {
+                                                "type": "ApiConnection",
+                                                "inputs": {
+                                                    "host": {
+                                                        "connection": {
+                                                            "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                        }
+                                                    },
+                                                    "method": "post",
+                                                    "body": {
+                                                        "To": "abc@xyz.com",
+                                                        "Subject": "Teams Call Queue Request Failure",
+                                                        "Body": "<p class=\"editor-paragraph\">This email is to notify that a request to amend a Teams Call Queue has failed to complete.<br><br>Please log onto Azure to check for errors in the Runbook.<br><br>Job ID: @{body('Amend_Call_Queue_-_Welcome_and_Overflow')?['properties']?['jobId']}<br>Request ID: @{body('Amend_Call_Queue_-_Welcome_and_Overflow')?['id']}<br>Start Time: @{body('Amend_Call_Queue_-_Welcome_and_Overflow')?['properties']?['startTime']}</p>",
+                                                        "Importance": "High"
+                                                    },
+                                                    "path": "/v2/Mail"
+                                                }
+                                            },
+                                            "Update_Item_-_WandO_Fail": {
+                                                "runAfter": {
+                                                    "Send_Error_Email_-_WandO": [
+                                                        "Succeeded"
+                                                    ]
+                                                },
+                                                "type": "ApiConnection",
+                                                "inputs": {
+                                                    "host": {
+                                                        "connection": {
+                                                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                        }
+                                                    },
+                                                    "method": "patch",
+                                                    "body": {
+                                                        "Status": "Failed"
+                                                    },
+                                                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "expression": {
+                                        "and": [
+                                            {
+                                                "equals": [
+                                                    "@body('Amend_Call_Queue_-_Welcome_and_Overflow')?['properties']?['status']",
+                                                    "Completed"
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "type": "If"
+                                }
+                            },
+                            "else": {
+                                "actions": {
+                                    "Welcome-Yes,Overflow-No,Timeout-Yes": {
+                                        "actions": {
+                                            "Amend_Call_Queue_-_Welcome_and_Timeout": {
+                                                "type": "ApiConnection",
+                                                "inputs": {
+                                                    "host": {
+                                                        "connection": {
+                                                            "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+                                                        }
+                                                    },
+                                                    "method": "put",
+                                                    "body": {
+                                                        "properties": {
+                                                            "parameters": {
+                                                                "groupId": "@triggerBody()?['M365GroupID']",
+                                                                "ResourceId": "@triggerBody()?['CQResourceID']",
+                                                                "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                "TimeoutThreshold": "@triggerBody()?['TimeoutThreshold']",
+                                                                "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                "AgentAlertTime": "@triggerBody()?['AgentAlertTime']",
+                                                                "OverflowThreshold": "@triggerBody()?['OverflowThreshold']",
+                                                                "CallQueueName": "@triggerBody()?['CQName']",
+                                                                "WelcomeTextToSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                                "CallQueueID": "@triggerBody()?['CallQueueID']",
+                                                                "TimeoutTextToSpeech": "@triggerBody()?['TimeoutGreeting']",
+                                                                "NameChange": "@triggerBody()?['CQNameChange']"
+                                                            }
+                                                        }
+                                                    },
+                                                    "path": "/subscriptions/@{encodeURIComponent(parameters('Subscription Name'))}/resourceGroups/@{encodeURIComponent(parameters('Resource Group'))}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent(parameters('Automation Account Name'))}/jobs",
+                                                    "queries": {
+                                                        "x-ms-api-version": "2015-10-31",
+                                                        "runbookName": "CQAmend-WelcomeGreetTimeoutGreet-NoOverflow",
+                                                        "wait": true
+                                                    }
+                                                }
+                                            },
+                                            "Check_Runbook_Status_-_WandT": {
+                                                "actions": {
+                                                    "Send_Fulfilment_Email_-_WandT": {
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "post",
+                                                            "body": {
+                                                                "To": "@triggerBody()?['Owner']",
+                                                                "Subject": "Teams Call Queue Amendment Request - @{triggerBody()?['RequestID']}",
+                                                                "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request, @{triggerBody()?['RequestID']} , to amend Call Queue @{triggerBody()?['CQName']} has been completed.<br><br>Thanks,<br><br>The Voice and Video Team</p>",
+                                                                "Importance": "Normal"
+                                                            },
+                                                            "path": "/v2/Mail"
+                                                        }
+                                                    },
+                                                    "Update_Item_-_WandT_Success": {
+                                                        "runAfter": {
+                                                            "Send_Fulfilment_Email_-_WandT": [
+                                                                "Succeeded"
+                                                            ]
+                                                        },
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "patch",
+                                                            "body": {
+                                                                "Status": "Completed"
+                                                            },
+                                                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                        }
+                                                    },
+                                                    "Update_Call_Queue_List_-_WandT": {
+                                                        "runAfter": {
+                                                            "Update_Item_-_WandT_Success": [
+                                                                "Succeeded"
+                                                            ]
+                                                        },
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "patch",
+                                                            "body": {
+                                                                "Name": "@triggerBody()?['CQName']",
+                                                                "WelcomeGreeting": "@triggerBody()?['WelcomeValue']",
+                                                                "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                "AgentAlertTime": "@variables('CQAlertTime')",
+                                                                "OverflowThreshold": "@variables('CQOverflowTime')",
+                                                                "TimeoutThreshold": "@variables('CQTimeoutTime')",
+                                                                "WelcomeTexttoSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                                "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                "OverflowText": "@triggerBody()?['OverflowGreeting']",
+                                                                "TimeoutText": "@triggerBody()?['TimeoutGreeting']",
+                                                                "OverflowGreeting": "@triggerBody()?['OverflowValue']",
+                                                                "TimeoutGreeting": "@triggerBody()?['TimeoutValue']"
+                                                            },
+                                                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointListID'])}"
+                                                        }
+                                                    }
+                                                },
+                                                "runAfter": {
+                                                    "Amend_Call_Queue_-_Welcome_and_Timeout": [
+                                                        "Succeeded"
+                                                    ]
+                                                },
+                                                "else": {
+                                                    "actions": {
+                                                        "Send_Error_Email_-_WandT": {
+                                                            "type": "ApiConnection",
+                                                            "inputs": {
+                                                                "host": {
+                                                                    "connection": {
+                                                                        "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                    }
+                                                                },
+                                                                "method": "post",
+                                                                "body": {
+                                                                    "To": "abc@xyz.com",
+                                                                    "Subject": "Teams Call Queue Request Failure",
+                                                                    "Body": "<p class=\"editor-paragraph\">This email is to notify that a request to amend a Teams Call Queue has failed to complete.<br><br>Please log onto Azure to check for errors in the Runbook.<br><br>Job ID: @{body('Amend_Call_Queue_-_Welcome_and_Timeout')?['properties']?['jobId']}<br>Request ID: @{body('Amend_Call_Queue_-_Welcome_and_Timeout')?['id']}<br>Start Time: @{body('Amend_Call_Queue_-_Welcome_and_Timeout')?['properties']?['startTime']}<br></p><br>",
+                                                                    "Importance": "High"
+                                                                },
+                                                                "path": "/v2/Mail"
+                                                            }
+                                                        },
+                                                        "Update_Item_-_WandT_Fail": {
+                                                            "runAfter": {
+                                                                "Send_Error_Email_-_WandT": [
+                                                                    "Succeeded"
+                                                                ]
+                                                            },
+                                                            "type": "ApiConnection",
+                                                            "inputs": {
+                                                                "host": {
+                                                                    "connection": {
+                                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                    }
+                                                                },
+                                                                "method": "patch",
+                                                                "body": {
+                                                                    "Status": "Failed"
+                                                                },
+                                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                "expression": {
+                                                    "and": [
+                                                        {
+                                                            "equals": [
+                                                                "@body('Amend_Call_Queue_-_Welcome_and_Timeout')?['properties']?['status']",
+                                                                "Completed"
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                "type": "If"
+                                            }
+                                        },
+                                        "else": {
+                                            "actions": {
+                                                "Welcome-Yes,Overflow-Yes,Timeout-Yes": {
+                                                    "actions": {
+                                                        "Amend_Call_Queue_-_Welcome,_Overflow_and_Timeout": {
+                                                            "type": "ApiConnection",
+                                                            "inputs": {
+                                                                "host": {
+                                                                    "connection": {
+                                                                        "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+                                                                    }
+                                                                },
+                                                                "method": "put",
+                                                                "body": {
+                                                                    "properties": {
+                                                                        "parameters": {
+                                                                            "groupId": "@triggerBody()?['M365GroupID']",
+                                                                            "ResourceId": "@triggerBody()?['CQResourceID']",
+                                                                            "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                            "TimeoutThreshold": "@triggerBody()?['TimeoutThreshold']",
+                                                                            "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                            "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                            "AgentAlertTime": "@triggerBody()?['AgentAlertTime']",
+                                                                            "OverflowThreshold": "@triggerBody()?['OverflowThreshold']",
+                                                                            "CallQueueName": "@triggerBody()?['CQName']",
+                                                                            "WelcomeTextToSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                                            "CallQueueID": "@triggerBody()?['CallQueueID']",
+                                                                            "OverflowTextToSpeech": "@triggerBody()?['OverflowGreeting']",
+                                                                            "TimeoutTextToSpeech": "@triggerBody()?['TimeoutGreeting']",
+                                                                            "NameChange": "@triggerBody()?['CQNameChange']"
+                                                                        }
+                                                                    }
+                                                                },
+                                                                "path": "/subscriptions/@{encodeURIComponent(parameters('Subscription Name'))}/resourceGroups/@{encodeURIComponent(parameters('Resource Group'))}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent(parameters('Automation Account Name'))}/jobs",
+                                                                "queries": {
+                                                                    "x-ms-api-version": "2015-10-31",
+                                                                    "runbookName": "CQAmend-WelcomeGreetTimeoutGreetOverflowGreet",
+                                                                    "wait": true
+                                                                }
+                                                            }
+                                                        },
+                                                        "Check_Runbook_Status_-_WandOandT": {
+                                                            "actions": {
+                                                                "Send_Fulfilment_Email_-_WandOandT": {
+                                                                    "type": "ApiConnection",
+                                                                    "inputs": {
+                                                                        "host": {
+                                                                            "connection": {
+                                                                                "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                            }
+                                                                        },
+                                                                        "method": "post",
+                                                                        "body": {
+                                                                            "To": "@triggerBody()?['Owner']",
+                                                                            "Subject": "Teams Call Queue Amendment Request - @{triggerBody()?['RequestID']}",
+                                                                            "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request, @{triggerBody()?['RequestID']} , to amend Call Queue @{triggerBody()?['CQName']} has been completed.<br><br>Thanks,<br><br>The Voice and Video Team</p>",
+                                                                            "Importance": "Normal"
+                                                                        },
+                                                                        "path": "/v2/Mail"
+                                                                    }
+                                                                },
+                                                                "Update_Item_-_WandOandT_Success": {
+                                                                    "runAfter": {
+                                                                        "Send_Fulfilment_Email_-_WandOandT": [
+                                                                            "Succeeded"
+                                                                        ]
+                                                                    },
+                                                                    "type": "ApiConnection",
+                                                                    "inputs": {
+                                                                        "host": {
+                                                                            "connection": {
+                                                                                "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                            }
+                                                                        },
+                                                                        "method": "patch",
+                                                                        "body": {
+                                                                            "Status": "Completed"
+                                                                        },
+                                                                        "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                    }
+                                                                },
+                                                                "Update_Call_Queue_List_-_WandOandT": {
+                                                                    "runAfter": {
+                                                                        "Update_Item_-_WandOandT_Success": [
+                                                                            "Succeeded"
+                                                                        ]
+                                                                    },
+                                                                    "type": "ApiConnection",
+                                                                    "inputs": {
+                                                                        "host": {
+                                                                            "connection": {
+                                                                                "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                            }
+                                                                        },
+                                                                        "method": "patch",
+                                                                        "body": {
+                                                                            "Name": "@triggerBody()?['CQName']",
+                                                                            "WelcomeGreeting": "@triggerBody()?['WelcomeValue']",
+                                                                            "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                            "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                            "AgentAlertTime": "@variables('CQAlertTime')",
+                                                                            "OverflowThreshold": "@variables('CQOverflowTime')",
+                                                                            "TimeoutThreshold": "@variables('CQTimeoutTime')",
+                                                                            "WelcomeTexttoSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                                            "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                            "OverflowText": "@triggerBody()?['OverflowGreeting']",
+                                                                            "TimeoutText": "@triggerBody()?['TimeoutGreeting']",
+                                                                            "OverflowGreeting": "@triggerBody()?['OverflowValue']",
+                                                                            "TimeoutGreeting": "@triggerBody()?['TimeoutValue']"
+                                                                        },
+                                                                        "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointListID'])}"
+                                                                    }
+                                                                }
+                                                            },
+                                                            "runAfter": {
+                                                                "Amend_Call_Queue_-_Welcome,_Overflow_and_Timeout": [
+                                                                    "Succeeded"
+                                                                ]
+                                                            },
+                                                            "else": {
+                                                                "actions": {
+                                                                    "Send_Error_Email_-_WandOandT": {
+                                                                        "type": "ApiConnection",
+                                                                        "inputs": {
+                                                                            "host": {
+                                                                                "connection": {
+                                                                                    "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                                }
+                                                                            },
+                                                                            "method": "post",
+                                                                            "body": {
+                                                                                "To": "abc@xyz.com",
+                                                                                "Subject": "Teams Call Queue Request Failure",
+                                                                                "Body": "<p class=\"editor-paragraph\">This email is to notify that a request to amend a Teams Call Queue has failed to complete.<br><br>Please log onto Azure to check for errors in the Runbook.<br><br>Job ID: @{body('Amend_Call_Queue_-_Welcome,_Overflow_and_Timeout')?['properties']?['jobId']}<br>Request ID: @{body('Amend_Call_Queue_-_Welcome,_Overflow_and_Timeout')?['id']}<br>Start Time: @{body('Amend_Call_Queue_-_Welcome,_Overflow_and_Timeout')?['properties']?['startTime']}</p>",
+                                                                                "Importance": "High"
+                                                                            },
+                                                                            "path": "/v2/Mail"
+                                                                        }
+                                                                    },
+                                                                    "Update_Item_-_WandOandT_Fail": {
+                                                                        "runAfter": {
+                                                                            "Send_Error_Email_-_WandOandT": [
+                                                                                "Succeeded"
+                                                                            ]
+                                                                        },
+                                                                        "type": "ApiConnection",
+                                                                        "inputs": {
+                                                                            "host": {
+                                                                                "connection": {
+                                                                                    "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                }
+                                                                            },
+                                                                            "method": "patch",
+                                                                            "body": {
+                                                                                "Status": "Failed"
+                                                                            },
+                                                                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                        }
+                                                                    }
+                                                                }
+                                                            },
+                                                            "expression": {
+                                                                "and": [
+                                                                    {
+                                                                        "equals": [
+                                                                            "@body('Amend_Call_Queue_-_Welcome,_Overflow_and_Timeout')?['properties']?['status']",
+                                                                            "Completed"
+                                                                        ]
+                                                                    }
+                                                                ]
+                                                            },
+                                                            "type": "If"
+                                                        }
+                                                    },
+                                                    "else": {
+                                                        "actions": {
+                                                            "Welcome-No,Overflow-Yes,Timeout-Yes": {
+                                                                "actions": {
+                                                                    "Amend_Call_Queue_-_Timeout_and_Overflow": {
+                                                                        "type": "ApiConnection",
+                                                                        "inputs": {
+                                                                            "host": {
+                                                                                "connection": {
+                                                                                    "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+                                                                                }
+                                                                            },
+                                                                            "method": "put",
+                                                                            "body": {
+                                                                                "properties": {
+                                                                                    "parameters": {
+                                                                                        "groupId": "@triggerBody()?['M365GroupID']",
+                                                                                        "ResourceId": "@triggerBody()?['CQResourceID']",
+                                                                                        "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                                        "TimeoutThreshold": "@triggerBody()?['TimeoutThreshold']",
+                                                                                        "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                                        "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                                        "AgentAlertTime": "@triggerBody()?['AgentAlertTime']",
+                                                                                        "OverflowThreshold": "@triggerBody()?['OverflowThreshold']",
+                                                                                        "CallQueueName": "@triggerBody()?['CQName']",
+                                                                                        "CallQueueID": "@triggerBody()?['CallQueueID']",
+                                                                                        "OverflowTextToSpeech": "@triggerBody()?['OverflowGreeting']",
+                                                                                        "TimeoutTextToSpeech": "@triggerBody()?['TimeoutGreeting']",
+                                                                                        "NameChange": "@triggerBody()?['CQNameChange']"
+                                                                                    }
+                                                                                }
+                                                                            },
+                                                                            "path": "/subscriptions/@{encodeURIComponent(parameters('Subscription Name'))}/resourceGroups/@{encodeURIComponent(parameters('Resource Group'))}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent(parameters('Automation Account Name'))}/jobs",
+                                                                            "queries": {
+                                                                                "x-ms-api-version": "2015-10-31",
+                                                                                "runbookName": "CQAmend-OverflowGreetTimeoutGreet-NoWelcome",
+                                                                                "wait": true
+                                                                            }
+                                                                        }
+                                                                    },
+                                                                    "Check_Runbook_Status_-_OandT": {
+                                                                        "actions": {
+                                                                            "Send_Fulfilment_Email_-_OandT": {
+                                                                                "type": "ApiConnection",
+                                                                                "inputs": {
+                                                                                    "host": {
+                                                                                        "connection": {
+                                                                                            "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                                        }
+                                                                                    },
+                                                                                    "method": "post",
+                                                                                    "body": {
+                                                                                        "To": "@triggerBody()?['Owner']",
+                                                                                        "Subject": "Teams Call Queue Amendment Request - @{triggerBody()?['RequestID']}",
+                                                                                        "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request, @{triggerBody()?['RequestID']} , to amend Call Queue @{triggerBody()?['CQName']} has been completed.<br><br>Thanks,<br><br>The Voice and Video Team</p>",
+                                                                                        "Importance": "Normal"
+                                                                                    },
+                                                                                    "path": "/v2/Mail"
+                                                                                }
+                                                                            },
+                                                                            "Update_Item_-_OandT_Success": {
+                                                                                "runAfter": {
+                                                                                    "Send_Fulfilment_Email_-_OandT": [
+                                                                                        "Succeeded"
+                                                                                    ]
+                                                                                },
+                                                                                "type": "ApiConnection",
+                                                                                "inputs": {
+                                                                                    "host": {
+                                                                                        "connection": {
+                                                                                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                        }
+                                                                                    },
+                                                                                    "method": "patch",
+                                                                                    "body": {
+                                                                                        "Status": "Completed"
+                                                                                    },
+                                                                                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                                }
+                                                                            },
+                                                                            "Update_Call_Queue_List_-_OandT": {
+                                                                                "runAfter": {
+                                                                                    "Update_Item_-_OandT_Success": [
+                                                                                        "Succeeded"
+                                                                                    ]
+                                                                                },
+                                                                                "type": "ApiConnection",
+                                                                                "inputs": {
+                                                                                    "host": {
+                                                                                        "connection": {
+                                                                                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                        }
+                                                                                    },
+                                                                                    "method": "patch",
+                                                                                    "body": {
+                                                                                        "Name": "@triggerBody()?['CQName']",
+                                                                                        "WelcomeGreeting": "@triggerBody()?['WelcomeValue']",
+                                                                                        "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                                        "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                                        "AgentAlertTime": "@variables('CQAlertTime')",
+                                                                                        "OverflowThreshold": "@variables('CQOverflowTime')",
+                                                                                        "TimeoutThreshold": "@variables('CQTimeoutTime')",
+                                                                                        "WelcomeTexttoSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                                                        "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                                        "OverflowText": "@triggerBody()?['OverflowGreeting']",
+                                                                                        "TimeoutText": "@triggerBody()?['TimeoutGreeting']",
+                                                                                        "OverflowGreeting": "@triggerBody()?['OverflowValue']",
+                                                                                        "TimeoutGreeting": "@triggerBody()?['TimeoutValue']"
+                                                                                    },
+                                                                                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointListID'])}"
+                                                                                }
+                                                                            }
+                                                                        },
+                                                                        "runAfter": {
+                                                                            "Amend_Call_Queue_-_Timeout_and_Overflow": [
+                                                                                "Succeeded"
+                                                                            ]
+                                                                        },
+                                                                        "else": {
+                                                                            "actions": {
+                                                                                "Send_Error_Email_-_OandT": {
+                                                                                    "type": "ApiConnection",
+                                                                                    "inputs": {
+                                                                                        "host": {
+                                                                                            "connection": {
+                                                                                                "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                                            }
+                                                                                        },
+                                                                                        "method": "post",
+                                                                                        "body": {
+                                                                                            "To": "abc@xyz.com",
+                                                                                            "Subject": "Teams Call Queue Request Failure",
+                                                                                            "Body": "<p class=\"editor-paragraph\">This email is to notify that a request to amend a Teams Call Queue has failed to complete.<br><br>Please log onto Azure to check for errors in the Runbook.<br><br>Job ID: @{body('Amend_Call_Queue_-_Timeout_and_Overflow')?['properties']?['jobId']}<br>Request ID: @{body('Amend_Call_Queue_-_Timeout_and_Overflow')?['id']}<br>Start Time: @{body('Amend_Call_Queue_-_Timeout_and_Overflow')?['properties']?['startTime']}<br></p><br>",
+                                                                                            "Importance": "High"
+                                                                                        },
+                                                                                        "path": "/v2/Mail"
+                                                                                    }
+                                                                                },
+                                                                                "Update_Item_-_OandT_Fail": {
+                                                                                    "runAfter": {
+                                                                                        "Send_Error_Email_-_OandT": [
+                                                                                            "Succeeded"
+                                                                                        ]
+                                                                                    },
+                                                                                    "type": "ApiConnection",
+                                                                                    "inputs": {
+                                                                                        "host": {
+                                                                                            "connection": {
+                                                                                                "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                            }
+                                                                                        },
+                                                                                        "method": "patch",
+                                                                                        "body": {
+                                                                                            "Status": "Failed"
+                                                                                        },
+                                                                                        "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        },
+                                                                        "expression": {
+                                                                            "and": [
+                                                                                {
+                                                                                    "equals": [
+                                                                                        "@body('Amend_Call_Queue_-_Timeout_and_Overflow')?['properties']?['status']",
+                                                                                        "Completed"
+                                                                                    ]
+                                                                                }
+                                                                            ]
+                                                                        },
+                                                                        "type": "If"
+                                                                    }
+                                                                },
+                                                                "else": {
+                                                                    "actions": {
+                                                                        "Welcome-No,Overflow-Yes,Timeout-No": {
+                                                                            "actions": {
+                                                                                "Amend_Call_Queue_-_Overflow": {
+                                                                                    "type": "ApiConnection",
+                                                                                    "inputs": {
+                                                                                        "host": {
+                                                                                            "connection": {
+                                                                                                "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+                                                                                            }
+                                                                                        },
+                                                                                        "method": "put",
+                                                                                        "body": {
+                                                                                            "properties": {
+                                                                                                "parameters": {
+                                                                                                    "groupId": "@triggerBody()?['M365GroupID']",
+                                                                                                    "ResourceId": "@triggerBody()?['CQResourceID']",
+                                                                                                    "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                                                    "TimeoutThreshold": "@triggerBody()?['TimeoutThreshold']",
+                                                                                                    "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                                                    "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                                                    "AgentAlertTime": "@triggerBody()?['AgentAlertTime']",
+                                                                                                    "OverflowThreshold": "@triggerBody()?['OverflowThreshold']",
+                                                                                                    "CallQueueName": "@triggerBody()?['CQName']",
+                                                                                                    "CallQueueID": "@triggerBody()?['CallQueueID']",
+                                                                                                    "OverflowTextToSpeech": "@triggerBody()?['OverflowGreeting']",
+                                                                                                    "NameChange": "@triggerBody()?['CQNameChange']"
+                                                                                                }
+                                                                                            }
+                                                                                        },
+                                                                                        "path": "/subscriptions/@{encodeURIComponent(parameters('Subscription Name'))}/resourceGroups/@{encodeURIComponent(parameters('Resource Group'))}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent(parameters('Automation Account Name'))}/jobs",
+                                                                                        "queries": {
+                                                                                            "x-ms-api-version": "2015-10-31",
+                                                                                            "runbookName": "CQAmend-OverflowGreet-NoWelcomeNoTimeout",
+                                                                                            "wait": true
+                                                                                        }
+                                                                                    }
+                                                                                },
+                                                                                "Check_Runbook_Status_-_Overflow": {
+                                                                                    "actions": {
+                                                                                        "Send_Fulfilment_Email_-_Overflow": {
+                                                                                            "type": "ApiConnection",
+                                                                                            "inputs": {
+                                                                                                "host": {
+                                                                                                    "connection": {
+                                                                                                        "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                                                    }
+                                                                                                },
+                                                                                                "method": "post",
+                                                                                                "body": {
+                                                                                                    "To": "@triggerBody()?['Owner']",
+                                                                                                    "Subject": "Teams Call Queue Request Amendment - @{triggerBody()?['RequestID']}",
+                                                                                                    "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request, @{triggerBody()?['RequestID']} , to amend Call Queue @{triggerBody()?['CQName']} has been completed.<br><br>Thanks,<br><br>The Voice and Video Team</p>",
+                                                                                                    "Importance": "Normal"
+                                                                                                },
+                                                                                                "path": "/v2/Mail"
+                                                                                            }
+                                                                                        },
+                                                                                        "Update_Item_-_Overflow_Success": {
+                                                                                            "runAfter": {
+                                                                                                "Send_Fulfilment_Email_-_Overflow": [
+                                                                                                    "Succeeded"
+                                                                                                ]
+                                                                                            },
+                                                                                            "type": "ApiConnection",
+                                                                                            "inputs": {
+                                                                                                "host": {
+                                                                                                    "connection": {
+                                                                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                                    }
+                                                                                                },
+                                                                                                "method": "patch",
+                                                                                                "body": {
+                                                                                                    "Status": "Completed"
+                                                                                                },
+                                                                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                                            }
+                                                                                        },
+                                                                                        "Update_Call_Queue_List_-_Overflow": {
+                                                                                            "runAfter": {
+                                                                                                "Update_Item_-_Overflow_Success": [
+                                                                                                    "Succeeded"
+                                                                                                ]
+                                                                                            },
+                                                                                            "type": "ApiConnection",
+                                                                                            "inputs": {
+                                                                                                "host": {
+                                                                                                    "connection": {
+                                                                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                                    }
+                                                                                                },
+                                                                                                "method": "patch",
+                                                                                                "body": {
+                                                                                                    "Name": "@triggerBody()?['CQName']",
+                                                                                                    "WelcomeGreeting": "@triggerBody()?['WelcomeValue']",
+                                                                                                    "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                                                    "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                                                    "AgentAlertTime": "@variables('CQAlertTime')",
+                                                                                                    "OverflowThreshold": "@variables('CQOverflowTime')",
+                                                                                                    "TimeoutThreshold": "@variables('CQTimeoutTime')",
+                                                                                                    "WelcomeTexttoSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                                                                    "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                                                    "OverflowText": "@triggerBody()?['OverflowGreeting']",
+                                                                                                    "TimeoutText": "@triggerBody()?['TimeoutGreeting']",
+                                                                                                    "OverflowGreeting": "@triggerBody()?['OverflowValue']",
+                                                                                                    "TimeoutGreeting": "@triggerBody()?['TimeoutValue']"
+                                                                                                },
+                                                                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointListID'])}"
+                                                                                            }
+                                                                                        }
+                                                                                    },
+                                                                                    "runAfter": {
+                                                                                        "Amend_Call_Queue_-_Overflow": [
+                                                                                            "Succeeded"
+                                                                                        ]
+                                                                                    },
+                                                                                    "else": {
+                                                                                        "actions": {
+                                                                                            "Send_Error_Email_-_Overflow": {
+                                                                                                "type": "ApiConnection",
+                                                                                                "inputs": {
+                                                                                                    "host": {
+                                                                                                        "connection": {
+                                                                                                            "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "method": "post",
+                                                                                                    "body": {
+                                                                                                        "To": "abc@xyz.com",
+                                                                                                        "Subject": "Teams Call Queue Request Failure",
+                                                                                                        "Body": "<p class=\"editor-paragraph\">This email is to notify that a request to amend a Teams Call Queue has failed to complete.<br><br>Please log onto Azure to check for errors in the Runbook.<br><br>Job ID: @{body('Amend_Call_Queue_-_Overflow')?['properties']?['jobId']}<br>Request ID: @{body('Amend_Call_Queue_-_Overflow')?['id']}<br>Start Time: @{body('Amend_Call_Queue_-_Overflow')?['properties']?['startTime']}<br></p><br>",
+                                                                                                        "Importance": "High"
+                                                                                                    },
+                                                                                                    "path": "/v2/Mail"
+                                                                                                }
+                                                                                            },
+                                                                                            "Update_Item_-_Overflow_Fail": {
+                                                                                                "runAfter": {
+                                                                                                    "Send_Error_Email_-_Overflow": [
+                                                                                                        "Succeeded"
+                                                                                                    ]
+                                                                                                },
+                                                                                                "type": "ApiConnection",
+                                                                                                "inputs": {
+                                                                                                    "host": {
+                                                                                                        "connection": {
+                                                                                                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "method": "patch",
+                                                                                                    "body": {
+                                                                                                        "Status": "Failed"
+                                                                                                    },
+                                                                                                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    },
+                                                                                    "expression": {
+                                                                                        "and": [
+                                                                                            {
+                                                                                                "equals": [
+                                                                                                    "@body('Amend_Call_Queue_-_Overflow')?['properties']?['status']",
+                                                                                                    "Completed"
+                                                                                                ]
+                                                                                            }
+                                                                                        ]
+                                                                                    },
+                                                                                    "type": "If"
+                                                                                }
+                                                                            },
+                                                                            "else": {
+                                                                                "actions": {
+                                                                                    "Welcome-No,Overflow-No,Timeout-Yes": {
+                                                                                        "actions": {
+                                                                                            "Amend_Call_Queue_-_Timeout": {
+                                                                                                "type": "ApiConnection",
+                                                                                                "inputs": {
+                                                                                                    "host": {
+                                                                                                        "connection": {
+                                                                                                            "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "method": "put",
+                                                                                                    "body": {
+                                                                                                        "properties": {
+                                                                                                            "parameters": {
+                                                                                                                "groupId": "@triggerBody()?['M365GroupID']",
+                                                                                                                "ResourceId": "@triggerBody()?['CQResourceID']",
+                                                                                                                "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                                                                "TimeoutThreshold": "@triggerBody()?['TimeoutThreshold']",
+                                                                                                                "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                                                                "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                                                                "AgentAlertTime": "@triggerBody()?['AgentAlertTime']",
+                                                                                                                "OverflowThreshold": "@triggerBody()?['OverflowThreshold']",
+                                                                                                                "CallQueueName": "@triggerBody()?['CQName']",
+                                                                                                                "CallQueueID": "@triggerBody()?['CallQueueID']",
+                                                                                                                "TimeoutTextToSpeech": "@triggerBody()?['TimeoutGreeting']",
+                                                                                                                "NameChange": "@triggerBody()?['CQNameChange']"
+                                                                                                            }
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "path": "/subscriptions/@{encodeURIComponent(parameters('Subscription Name'))}/resourceGroups/@{encodeURIComponent(parameters('Resource Group'))}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent(parameters('Automation Account Name'))}/jobs",
+                                                                                                    "queries": {
+                                                                                                        "x-ms-api-version": "2015-10-31",
+                                                                                                        "runbookName": "CQAmend-TimeoutGreet-NoWelcomeNoOverflow",
+                                                                                                        "wait": true
+                                                                                                    }
+                                                                                                }
+                                                                                            },
+                                                                                            "Check_Runbook_Status_-_Timeout": {
+                                                                                                "actions": {
+                                                                                                    "Send_Fulfilment_Email_-_Timeout": {
+                                                                                                        "type": "ApiConnection",
+                                                                                                        "inputs": {
+                                                                                                            "host": {
+                                                                                                                "connection": {
+                                                                                                                    "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                                                                }
+                                                                                                            },
+                                                                                                            "method": "post",
+                                                                                                            "body": {
+                                                                                                                "To": "@triggerBody()?['Owner']",
+                                                                                                                "Subject": "Teams Call Queue Amendment Request - @{triggerBody()?['RequestID']}",
+                                                                                                                "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request, @{triggerBody()?['RequestID']} , to amend Call Queue @{triggerBody()?['CQName']} has been completed.<br><br>Thanks,<br><br>The Voice and Video Team</p>",
+                                                                                                                "Importance": "Normal"
+                                                                                                            },
+                                                                                                            "path": "/v2/Mail"
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "Update_Item_-_Timeout_Success": {
+                                                                                                        "runAfter": {
+                                                                                                            "Send_Fulfilment_Email_-_Timeout": [
+                                                                                                                "Succeeded"
+                                                                                                            ]
+                                                                                                        },
+                                                                                                        "type": "ApiConnection",
+                                                                                                        "inputs": {
+                                                                                                            "host": {
+                                                                                                                "connection": {
+                                                                                                                    "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                                                }
+                                                                                                            },
+                                                                                                            "method": "patch",
+                                                                                                            "body": {
+                                                                                                                "Status": "Completed"
+                                                                                                            },
+                                                                                                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "Update_Call_Queue_List_-_Timeout": {
+                                                                                                        "runAfter": {
+                                                                                                            "Update_Item_-_Timeout_Success": [
+                                                                                                                "Succeeded"
+                                                                                                            ]
+                                                                                                        },
+                                                                                                        "type": "ApiConnection",
+                                                                                                        "inputs": {
+                                                                                                            "host": {
+                                                                                                                "connection": {
+                                                                                                                    "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                                                }
+                                                                                                            },
+                                                                                                            "method": "patch",
+                                                                                                            "body": {
+                                                                                                                "Name": "@triggerBody()?['CQName']",
+                                                                                                                "WelcomeGreeting": "@triggerBody()?['WelcomeValue']",
+                                                                                                                "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                                                                "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                                                                "AgentAlertTime": "@variables('CQAlertTime')",
+                                                                                                                "OverflowThreshold": "@variables('CQOverflowTime')",
+                                                                                                                "TimeoutThreshold": "@variables('CQTimeoutTime')",
+                                                                                                                "WelcomeTexttoSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                                                                                "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                                                                "OverflowText": "@triggerBody()?['OverflowGreeting']",
+                                                                                                                "TimeoutText": "@triggerBody()?['TimeoutGreeting']",
+                                                                                                                "OverflowGreeting": "@triggerBody()?['OverflowValue']",
+                                                                                                                "TimeoutGreeting": "@triggerBody()?['TimeoutValue']"
+                                                                                                            },
+                                                                                                            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointListID'])}"
+                                                                                                        }
+                                                                                                    }
+                                                                                                },
+                                                                                                "runAfter": {
+                                                                                                    "Amend_Call_Queue_-_Timeout": [
+                                                                                                        "Succeeded"
+                                                                                                    ]
+                                                                                                },
+                                                                                                "else": {
+                                                                                                    "actions": {
+                                                                                                        "Send_Error_Email_-_Timeout": {
+                                                                                                            "type": "ApiConnection",
+                                                                                                            "inputs": {
+                                                                                                                "host": {
+                                                                                                                    "connection": {
+                                                                                                                        "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                                                                    }
+                                                                                                                },
+                                                                                                                "method": "post",
+                                                                                                                "body": {
+                                                                                                                    "To": "abc@xyz.com",
+                                                                                                                    "Subject": "Teams Call Queue Request Failure",
+                                                                                                                    "Body": "<p class=\"editor-paragraph\">This email is to notify that a request to amend a Teams Call Queue has failed to complete.<br><br>Please log onto Azure to check for errors in the Runbook.<br><br>Job ID: @{body('Amend_Call_Queue_-_Timeout')?['properties']?['jobId']}<br>Request ID: @{body('Amend_Call_Queue_-_Timeout')?['id']}<br>Start Time: @{body('Amend_Call_Queue_-_Timeout')?['properties']?['startTime']}<br></p><br>",
+                                                                                                                    "Importance": "High"
+                                                                                                                },
+                                                                                                                "path": "/v2/Mail"
+                                                                                                            }
+                                                                                                        },
+                                                                                                        "Update_Item_-_Timeout_Fail": {
+                                                                                                            "runAfter": {
+                                                                                                                "Send_Error_Email_-_Timeout": [
+                                                                                                                    "Succeeded"
+                                                                                                                ]
+                                                                                                            },
+                                                                                                            "type": "ApiConnection",
+                                                                                                            "inputs": {
+                                                                                                                "host": {
+                                                                                                                    "connection": {
+                                                                                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                                                    }
+                                                                                                                },
+                                                                                                                "method": "patch",
+                                                                                                                "body": {
+                                                                                                                    "Status": "Failed"
+                                                                                                                },
+                                                                                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+                                                                                                },
+                                                                                                "expression": {
+                                                                                                    "and": [
+                                                                                                        {
+                                                                                                            "equals": [
+                                                                                                                "@body('Amend_Call_Queue_-_Timeout')?['properties']?['status']",
+                                                                                                                "Completed"
+                                                                                                            ]
+                                                                                                        }
+                                                                                                    ]
+                                                                                                },
+                                                                                                "type": "If"
+                                                                                            }
+                                                                                        },
+                                                                                        "else": {
+                                                                                            "actions": {
+                                                                                                "Amend_Call_Queue_-_No_Greet": {
+                                                                                                    "type": "ApiConnection",
+                                                                                                    "inputs": {
+                                                                                                        "host": {
+                                                                                                            "connection": {
+                                                                                                                "name": "@parameters('$connections')['azureautomation-1']['connectionId']"
+                                                                                                            }
+                                                                                                        },
+                                                                                                        "method": "put",
+                                                                                                        "body": {
+                                                                                                            "properties": {
+                                                                                                                "parameters": {
+                                                                                                                    "groupId": "@triggerBody()?['M365GroupID']",
+                                                                                                                    "ResourceId": "@triggerBody()?['CQResourceID']",
+                                                                                                                    "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                                                                    "TimeoutThreshold": "@triggerBody()?['TimeoutThreshold']",
+                                                                                                                    "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                                                                    "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                                                                    "AgentAlertTime": "@triggerBody()?['AgentAlertTime']",
+                                                                                                                    "OverflowThreshold": "@triggerBody()?['OverflowThreshold']",
+                                                                                                                    "CallQueueName": "@triggerBody()?['CQName']",
+                                                                                                                    "CallQueueID": "@triggerBody()?['CallQueueID']",
+                                                                                                                    "NameChange": "@triggerBody()?['CQNameChange']"
+                                                                                                                }
+                                                                                                            }
+                                                                                                        },
+                                                                                                        "path": "/subscriptions/@{encodeURIComponent(parameters('Subscription Name'))}/resourceGroups/@{encodeURIComponent(parameters('Resource Group'))}/providers/Microsoft.Automation/automationAccounts/@{encodeURIComponent(parameters('Automation Account Name'))}/jobs",
+                                                                                                        "queries": {
+                                                                                                            "x-ms-api-version": "2015-10-31",
+                                                                                                            "runbookName": "CQAmend-NoWelcomeNoOverflowNoTimeout",
+                                                                                                            "wait": true
+                                                                                                        }
+                                                                                                    }
+                                                                                                },
+                                                                                                "Check_Runbook_Status_-_No_Greet": {
+                                                                                                    "actions": {
+                                                                                                        "Send_Fulfilment_Email_-_No_Greet": {
+                                                                                                            "type": "ApiConnection",
+                                                                                                            "inputs": {
+                                                                                                                "host": {
+                                                                                                                    "connection": {
+                                                                                                                        "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                                                                    }
+                                                                                                                },
+                                                                                                                "method": "post",
+                                                                                                                "body": {
+                                                                                                                    "To": "@triggerBody()?['Owner']",
+                                                                                                                    "Subject": "Teams Call Queue Amendment Request - @{triggerBody()?['RequestID']}",
+                                                                                                                    "Body": "<p class=\"editor-paragraph\">Hi,<br><br>Your request, @{triggerBody()?['RequestID']} , to amend Call Queue @{triggerBody()?['CQName']} has been completed.<br><br>Thanks,<br><br>The Voice and Video Team</p>",
+                                                                                                                    "Importance": "Normal"
+                                                                                                                },
+                                                                                                                "path": "/v2/Mail"
+                                                                                                            }
+                                                                                                        },
+                                                                                                        "Update_Item_-_No_Greet_Success": {
+                                                                                                            "runAfter": {
+                                                                                                                "Send_Fulfilment_Email_-_No_Greet": [
+                                                                                                                    "Succeeded"
+                                                                                                                ]
+                                                                                                            },
+                                                                                                            "type": "ApiConnection",
+                                                                                                            "inputs": {
+                                                                                                                "host": {
+                                                                                                                    "connection": {
+                                                                                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                                                    }
+                                                                                                                },
+                                                                                                                "method": "patch",
+                                                                                                                "body": {
+                                                                                                                    "Status": "Completed"
+                                                                                                                },
+                                                                                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                                                            }
+                                                                                                        },
+                                                                                                        "Update_Call_Queue_List_-_No_Greet": {
+                                                                                                            "runAfter": {
+                                                                                                                "Update_Item_-_No_Greet_Success": [
+                                                                                                                    "Succeeded"
+                                                                                                                ]
+                                                                                                            },
+                                                                                                            "type": "ApiConnection",
+                                                                                                            "inputs": {
+                                                                                                                "host": {
+                                                                                                                    "connection": {
+                                                                                                                        "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                                                    }
+                                                                                                                },
+                                                                                                                "method": "patch",
+                                                                                                                "body": {
+                                                                                                                    "Name": "@triggerBody()?['CQName']",
+                                                                                                                    "WelcomeGreeting": "@triggerBody()?['WelcomeValue']",
+                                                                                                                    "RoutingMethod": "@triggerBody()?['RoutingMethod']",
+                                                                                                                    "AllowOptOut": "@triggerBody()?['AllowOptOut']",
+                                                                                                                    "AgentAlertTime": "@variables('CQAlertTime')",
+                                                                                                                    "OverflowThreshold": "@variables('CQOverflowTime')",
+                                                                                                                    "TimeoutThreshold": "@variables('CQTimeoutTime')",
+                                                                                                                    "WelcomeTexttoSpeech": "@triggerBody()?['WelcomeTextSpeech']",
+                                                                                                                    "PresenceBasedRouting": "@triggerBody()?['PresenceBasedRouting']",
+                                                                                                                    "OverflowText": "@triggerBody()?['OverflowGreeting']",
+                                                                                                                    "TimeoutText": "@triggerBody()?['TimeoutGreeting']",
+                                                                                                                    "OverflowGreeting": "@triggerBody()?['OverflowValue']",
+                                                                                                                    "TimeoutGreeting": "@triggerBody()?['TimeoutValue']"
+                                                                                                                },
+                                                                                                                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent('0b5e2e93-e32f-4c5c-af47-8b75006fd5b0'))}/items/@{encodeURIComponent(triggerBody()?['SharePointListID'])}"
+                                                                                                            }
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "runAfter": {
+                                                                                                        "Amend_Call_Queue_-_No_Greet": [
+                                                                                                            "Succeeded"
+                                                                                                        ]
+                                                                                                    },
+                                                                                                    "else": {
+                                                                                                        "actions": {
+                                                                                                            "Send_Error_Email_-_No_Greet": {
+                                                                                                                "type": "ApiConnection",
+                                                                                                                "inputs": {
+                                                                                                                    "host": {
+                                                                                                                        "connection": {
+                                                                                                                            "name": "@parameters('$connections')['office365-1']['connectionId']"
+                                                                                                                        }
+                                                                                                                    },
+                                                                                                                    "method": "post",
+                                                                                                                    "body": {
+                                                                                                                        "To": "abc@xyz.com",
+                                                                                                                        "Subject": "Teams Call Queue Request Failure",
+                                                                                                                        "Body": "<p class=\"editor-paragraph\">This email is to notify that a request to amend a Teams Call Queue has failed to complete.<br><br>Please log onto Azure to check for errors in the Runbook.<br><br>Job ID: @{body('Amend_Call_Queue_-_No_Greet')?['properties']?['jobId']}<br>Request ID: @{body('Amend_Call_Queue_-_No_Greet')?['id']}<br>Start Time: @{body('Amend_Call_Queue_-_No_Greet')?['properties']?['startTime']}<br></p><br>",
+                                                                                                                        "Importance": "High"
+                                                                                                                    },
+                                                                                                                    "path": "/v2/Mail"
+                                                                                                                }
+                                                                                                            },
+                                                                                                            "Update_Item_-_No_Greet_Fail": {
+                                                                                                                "runAfter": {
+                                                                                                                    "Send_Error_Email_-_No_Greet": [
+                                                                                                                        "Succeeded"
+                                                                                                                    ]
+                                                                                                                },
+                                                                                                                "type": "ApiConnection",
+                                                                                                                "inputs": {
+                                                                                                                    "host": {
+                                                                                                                        "connection": {
+                                                                                                                            "name": "@parameters('$connections')['sharepointonline-1']['connectionId']"
+                                                                                                                        }
+                                                                                                                    },
+                                                                                                                    "method": "patch",
+                                                                                                                    "body": {
+                                                                                                                        "Status": "Failed"
+                                                                                                                    },
+                                                                                                                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SharePoint Site')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('List Name')))}/items/@{encodeURIComponent(triggerBody()?['ID'])}"
+                                                                                                                }
+                                                                                                            }
+                                                                                                        }
+                                                                                                    },
+                                                                                                    "expression": {
+                                                                                                        "and": [
+                                                                                                            {
+                                                                                                                "equals": [
+                                                                                                                    "@body('Amend_Call_Queue_-_No_Greet')?['properties']?['status']",
+                                                                                                                    "Completed"
+                                                                                                                ]
+                                                                                                            }
+                                                                                                        ]
+                                                                                                    },
+                                                                                                    "type": "If"
+                                                                                                }
+                                                                                            }
+                                                                                        },
+                                                                                        "expression": {
+                                                                                            "and": [
+                                                                                                {
+                                                                                                    "equals": [
+                                                                                                        "@triggerBody()?['WelcomeValue']",
+                                                                                                        "No"
+                                                                                                    ]
+                                                                                                },
+                                                                                                {
+                                                                                                    "equals": [
+                                                                                                        "@triggerBody()?['OverflowValue']",
+                                                                                                        "No"
+                                                                                                    ]
+                                                                                                },
+                                                                                                {
+                                                                                                    "equals": [
+                                                                                                        "@triggerBody()?['TimeoutValue']",
+                                                                                                        "Yes"
+                                                                                                    ]
+                                                                                                }
+                                                                                            ]
+                                                                                        },
+                                                                                        "type": "If"
+                                                                                    }
+                                                                                }
+                                                                            },
+                                                                            "expression": {
+                                                                                "and": [
+                                                                                    {
+                                                                                        "equals": [
+                                                                                            "@triggerBody()?['WelcomeValue']",
+                                                                                            "No"
+                                                                                        ]
+                                                                                    },
+                                                                                    {
+                                                                                        "equals": [
+                                                                                            "@triggerBody()?['OverflowValue']",
+                                                                                            "Yes"
+                                                                                        ]
+                                                                                    },
+                                                                                    {
+                                                                                        "equals": [
+                                                                                            "@triggerBody()?['TimeoutValue']",
+                                                                                            "No"
+                                                                                        ]
+                                                                                    }
+                                                                                ]
+                                                                            },
+                                                                            "type": "If"
+                                                                        }
+                                                                    }
+                                                                },
+                                                                "expression": {
+                                                                    "and": [
+                                                                        {
+                                                                            "equals": [
+                                                                                "@triggerBody()?['WelcomeValue']",
+                                                                                "No"
+                                                                            ]
+                                                                        },
+                                                                        {
+                                                                            "equals": [
+                                                                                "@triggerBody()?['OverflowValue']",
+                                                                                "Yes"
+                                                                            ]
+                                                                        },
+                                                                        {
+                                                                            "equals": [
+                                                                                "@triggerBody()?['TimeoutValue']",
+                                                                                "Yess"
+                                                                            ]
+                                                                        }
+                                                                    ]
+                                                                },
+                                                                "type": "If"
+                                                            }
+                                                        }
+                                                    },
+                                                    "expression": {
+                                                        "and": [
+                                                            {
+                                                                "equals": [
+                                                                    "@triggerBody()?['WelcomeValue']",
+                                                                    "Yes"
+                                                                ]
+                                                            },
+                                                            {
+                                                                "equals": [
+                                                                    "@triggerBody()?['OverflowValue']",
+                                                                    "Yes"
+                                                                ]
+                                                            },
+                                                            {
+                                                                "equals": [
+                                                                    "@triggerBody()?['TimeoutValue']",
+                                                                    "Yes"
+                                                                ]
+                                                            }
+                                                        ]
+                                                    },
+                                                    "type": "If"
+                                                }
+                                            }
+                                        },
+                                        "expression": {
+                                            "and": [
+                                                {
+                                                    "equals": [
+                                                        "@triggerBody()?['WelcomeValue']",
+                                                        "Yes"
+                                                    ]
+                                                },
+                                                {
+                                                    "equals": [
+                                                        "@triggerBody()?['OverflowValue']",
+                                                        "No"
+                                                    ]
+                                                },
+                                                {
+                                                    "equals": [
+                                                        "@triggerBody()?['TimeoutValue']",
+                                                        "Yes"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "type": "If"
+                                    }
+                                }
+                            },
+                            "expression": {
+                                "and": [
+                                    {
+                                        "equals": [
+                                            "@triggerBody()?['WelcomeValue']",
+                                            "Yes"
+                                        ]
+                                    },
+                                    {
+                                        "equals": [
+                                            "@triggerBody()?['OverflowValue']",
+                                            "Yes"
+                                        ]
+                                    },
+                                    {
+                                        "equals": [
+                                            "@triggerBody()?['TimeoutValue']",
+                                            "No"
+                                        ]
+                                    }
+                                ]
+                            },
+                            "type": "If"
+                        }
+                    }
+                },
+                "expression": {
+                    "and": [
+                        {
+                            "equals": [
+                                "@triggerBody()?['WelcomeValue']",
+                                "Yes"
+                            ]
+                        },
+                        {
+                            "equals": [
+                                "@triggerBody()?['OverflowValue']",
+                                "No"
+                            ]
+                        },
+                        {
+                            "equals": [
+                                "@triggerBody()?['TimeoutValue']",
+                                "No"
+                            ]
+                        }
+                    ]
+                },
+                "type": "If"
+            },
+            "Display_Name_Change": {
+                "runAfter": {
+                    "Get_ID_of_new_item": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "CQ Display Name",
+                            "type": "string",
+                            "value": "@{triggerBody()?['CQNameChange']}"
+                        }
+                    ]
+                }
+            },
+            "CQAlertTime": {
+                "runAfter": {
+                    "Display_Name_Change": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "CQAlertTime",
+                            "type": "integer",
+                            "value": "@int(triggerBody()?['AgentAlertTime'])"
+                        }
+                    ]
+                }
+            },
+            "CQOverflowTime": {
+                "runAfter": {
+                    "CQAlertTime": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "CQOverflowTime",
+                            "type": "integer",
+                            "value": "@int(triggerBody()?['OverflowThreshold'])"
+                        }
+                    ]
+                }
+            },
+            "CQTimeoutTime": {
+                "runAfter": {
+                    "CQOverflowTime": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "CQTimeoutTime",
+                            "type": "integer",
+                            "value": "@int(triggerBody()?['TimeoutThreshold'])"
+                        }
+                    ]
+                }
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "SharePoint Site": {
+                "defaultValue": "aaaa",
+                "type": "String"
+            },
+            "List Name": {
+                "defaultValue": "bbbb",
+                "type": "String"
+            },
+            "Subscription Name": {
+                "defaultValue": "aaa-aaa-aaa",
+                "type": "String"
+            },
+            "Resource Group": {
+                "defaultValue": "cccc",
+                "type": "String"
+            },
+            "Automation Account Name": {
+                "defaultValue": "dddd",
+                "type": "String"
+            },
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "$connections": {
+            "type": "Object",
+            "value": {
+                "sharepointonline-1": {
+                    "id": "/subscriptions/aaa-aaa-aaa/providers/Microsoft.Web/locations/uksouth/managedApis/sharepointonline",
+                    "connectionId": "/subscriptions/aaa-aaa-aaa/resourceGroups/bbbb/providers/Microsoft.Web/connections/sharepointonline-2",
+                    "connectionName": "sharepointonline-2"
+                },
+                "azureautomation-1": {
+                    "id": "/subscriptions/aaa-aaa-aaa/providers/Microsoft.Web/locations/uksouth/managedApis/azureautomation",
+                    "connectionId": "/subscriptions/aaa-aaa-aaa/resourceGroups/bbbb/providers/Microsoft.Web/connections/azureautomation-1",
+                    "connectionName": "azureautomation-1",
+                    "connectionProperties": {
+                        "authentication": {
+                            "type": "ManagedServiceIdentity"
+                        }
+                    }
+                },
+                "office365-1": {
+                    "id": "/subscriptions/aaa-aaa-aaa/providers/Microsoft.Web/locations/uksouth/managedApis/office365",
+                    "connectionId": "/subscriptions/aaa-aaa-aaa/resourceGroups/bbbb/providers/Microsoft.Web/connections/office365-2",
+                    "connectionName": "office365-2"
+                }
+            }
+        }
+    }
+}
