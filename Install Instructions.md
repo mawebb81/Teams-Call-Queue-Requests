@@ -141,7 +141,7 @@ I've listed below each of the steps for this Logic App, add each one with the re
 3. Initialize Variable
    - Type = String
    - Value = substring(triggerBody()?['PhoneNumber'],1,12) (this will depend on how your number is formatted in your list, this example strips the first character as it has a '+' which we don't want.
-4. M365 Group HTTP Action (use the 
+4. M365 Group HTTP Request V2 action
    - URI = https://graph.microsoft.com/v1.0/groups/_M365GroupID_ (the M365 Group ID is the value from your SharePoint list)
    - Method = Delete
    - Connection = System Assigned Managed Identity
@@ -157,7 +157,8 @@ I've listed below each of the steps for this Logic App, add each one with the re
 6. Condition
    - Expression = Runbook Status is equal to Completed
 7. True Path
-   - Site Address = SharePoint Site parameter
+   - Update SharePoint Item
+     - Site Address = SharePoint Site parameter
      - List Name = List parameter
      - Id = ID of the SharePoint list item (dynamic value)
      - Status column = Completed
